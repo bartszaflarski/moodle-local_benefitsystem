@@ -97,9 +97,9 @@ class restore_local_benefitsystem_plugin extends restore_local_plugin {
     public function define_course_plugin_structure() {
         $paths = [];
 
-        // Path under /course/local plugins, matching backup structure.
+        // Path under /course/local plugins, matching backup structure (element name: course_points).
         $paths[] = new restore_path_element('local_benefitsystem_course',
-            $this->get_pathfor('/benefitsystem_course/course'));
+            $this->get_pathfor('/benefitsystem_course/course_points'));
 
         return $paths;
     }

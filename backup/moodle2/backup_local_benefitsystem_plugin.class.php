@@ -73,16 +73,16 @@ class backup_local_benefitsystem_plugin extends backup_local_plugin {
         // Create the plugin element (optigroup) under /course/local plugins.
         $plugin = $this->get_plugin_element();
 
-        // Wrapper element for this plugin's data.
+        // Wrapper element for this plugin's data (do not use name 'course' - conflicts with root).
         $wrapper = new backup_nested_element('benefitsystem_course');
         $plugin->add_child($wrapper);
 
-        // Course configuration (points per course).
-        $course = new backup_nested_element('course', ['id'], ['points']);
-        $wrapper->add_child($course);
+        // Course configuration (points per course). Name must be unique in backup tree.
+        $coursepoints = new backup_nested_element('course_points', ['id'], ['points']);
+        $wrapper->add_child($coursepoints);
 
         // Source table: at most one row per course in local_benefitsystem_course.
-        $course->set_source_table('local_benefitsystem_course', [
+        $coursepoints->set_source_table('local_benefitsystem_course', [
             'courseid' => backup::VAR_COURSEID,
         ]);
 
