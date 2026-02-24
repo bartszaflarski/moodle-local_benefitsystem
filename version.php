@@ -25,7 +25,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 $plugin->component = 'local_benefitsystem';
-$plugin->version = 2025020811; // Incremented for Benefit points field in main course settings.
+$plugin->version = 2025020812; // Incremented for backup/restore support for activity and course points.
 $plugin->requires = 2022041900; // Requires Moodle 4.0 or later.
 $plugin->maturity = MATURITY_STABLE;
 $plugin->release = '1.0';
