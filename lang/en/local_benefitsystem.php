@@ -136,6 +136,7 @@ $string['rewardexchanged'] = 'Successfully exchanged {$a->points} points for "{$
 $string['exchangefailed'] = 'Failed to exchange reward. Please try again.';
 $string['notenoughpoints'] = 'You do not have enough points to exchange for this reward.';
 $string['rewardnotavailable'] = 'This reward is not currently available.';
+$string['benefitsystem:managerewards'] = 'Manage Benefit system rewards';
 $string['yourrewards'] = 'Your Rewards';
 $string['exchangedrewards'] = 'Exchanged Rewards';
 $string['noexchanges'] = 'You have not exchanged any rewards yet.';
