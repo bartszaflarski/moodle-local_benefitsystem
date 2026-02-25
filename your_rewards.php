@@ -34,6 +34,7 @@ global $USER, $DB;
 
 // Your rewards page shows the current user's data; use user context (correct context level for security).
 $context = context_user::instance($USER->id);
+require_capability('local/benefitsystem:viewrewards', $context);
 
 $PAGE->set_context($context);
 $PAGE->set_url(new moodle_url('/local/benefitsystem/your_rewards.php'));

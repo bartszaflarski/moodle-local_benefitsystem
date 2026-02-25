@@ -33,6 +33,7 @@ require_login();
 global $USER, $DB;
 
 $context = context_system::instance();
+require_capability('local/benefitsystem:viewrewards', $context);
 
 $PAGE->set_context($context);
 $PAGE->set_url(new moodle_url('/local/benefitsystem/rewards.php'));

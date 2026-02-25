@@ -60,6 +60,10 @@ class restore_local_benefitsystem_plugin extends restore_local_plugin {
 
         $data = (object)$data;
 
+        // Restore controller already verified restore capability; explicit check for security scanners.
+        $context = context::instance_by_id($this->get_task()->get_contextid());
+        require_capability('moodle/restore:restorecourse', $context);
+
         // Map to the new coursemodule id in this restore.
         $cmid = $this->get_task()->get_moduleid();
         if (empty($cmid)) {
@@ -113,6 +117,10 @@ class restore_local_benefitsystem_plugin extends restore_local_plugin {
         global $DB;
 
         $data = (object)$data;
+
+        // Restore controller already verified restore capability; explicit check for security scanners.
+        $context = context::instance_by_id($this->get_task()->get_contextid());
+        require_capability('moodle/restore:restorecourse', $context);
 
         $courseid = $this->get_task()->get_courseid();
         if (empty($courseid)) {
