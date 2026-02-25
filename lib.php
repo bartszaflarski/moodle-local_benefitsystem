@@ -549,31 +549,56 @@ function local_benefitsystem_exchange_reward($userid, $rewardid) {
 function local_benefitsystem_get_user_exchanges($userid) {
     global $DB;
 
-    $exchanges = $DB->get_records('local_benefitsystem_exchanges', 
-        ['userid' => $userid, 'status' => 'completed'], 
+    $exchanges = $DB->get_records('local_benefitsystem_exchanges',
+        ['userid' => $userid, 'status' => 'completed'],
         'timecreated DESC'
     );
 
-    // Get reward details for each exchange.
+    if (empty($exchanges)) {
+        return [];
+    }
+
+    // Bulk load rewards (avoid N+1).
+    $rewardids = array_unique(array_map(function($e) {
+        return $e->rewardid;
+    }, $exchanges));
+    $rewards = $DB->get_records_list('local_benefitsystem_rewards', 'id', $rewardids);
+    if (empty($rewards)) {
+        return [];
+    }
+
+    // Bulk load codes for code-type rewards (used=1, exchangeid IN (...)).
+    $codeexchangeids = [];
+    foreach ($exchanges as $exchange) {
+        $r = $rewards[$exchange->rewardid] ?? null;
+        if ($r && $r->type === 'digital' && $r->digitalsubtype === 'code') {
+            $codeexchangeids[] = $exchange->id;
+        }
+    }
+    $codesbyexchange = [];
+    if (!empty($codeexchangeids)) {
+        list($insql, $inparams) = $DB->get_in_or_equal($codeexchangeids, SQL_PARAMS_NAMED);
+        $inparams['used'] = 1;
+        $codes = $DB->get_records_sql(
+            "SELECT id, exchangeid, code FROM {local_benefitsystem_codes} WHERE used = :used AND exchangeid $insql",
+            $inparams
+        );
+        foreach ($codes as $c) {
+            $codesbyexchange[$c->exchangeid] = $c->code;
+        }
+    }
+
     $result = [];
     foreach ($exchanges as $exchange) {
-        $reward = $DB->get_record('local_benefitsystem_rewards', ['id' => $exchange->rewardid]);
-        if ($reward) {
-            $exchange->reward = $reward;
-            
-            // For code-type rewards, get the assigned code.
-            if ($reward->type === 'digital' && $reward->digitalsubtype === 'code') {
-                $code = $DB->get_record('local_benefitsystem_codes', [
-                    'exchangeid' => $exchange->id,
-                    'used' => 1
-                ]);
-                if ($code) {
-                    $exchange->code = $code->code;
-                }
-            }
-            
-            $result[] = $exchange;
+        $reward = $rewards[$exchange->rewardid] ?? null;
+        if (!$reward) {
+            continue;
         }
+        $exchange->reward = $reward;
+        if ($reward->type === 'digital' && $reward->digitalsubtype === 'code' && isset($codesbyexchange[$exchange->id])) {
+            $exchange->code = $codesbyexchange[$exchange->id];
+        }
+        $result[] = $exchange;
     }
 
     return $result;
@@ -638,21 +663,34 @@ function local_benefitsystem_mark_as_redeemed($exchangeid, $userid) {
  */
 function local_benefitsystem_get_user_exchange_history($userid) {
     global $DB;
-    
-    $history = $DB->get_records('local_benefitsystem_exchange_history', 
-        ['userid' => $userid], 
+
+    $history = $DB->get_records('local_benefitsystem_exchange_history',
+        ['userid' => $userid],
         'timeredeemed DESC'
     );
-    
+
+    if (empty($history)) {
+        return [];
+    }
+
+    $rewardids = array_unique(array_map(function($r) {
+        return $r->rewardid;
+    }, $history));
+    $rewards = $DB->get_records_list('local_benefitsystem_rewards', 'id', $rewardids);
+    if (empty($rewards)) {
+        return [];
+    }
+
     $result = [];
     foreach ($history as $record) {
-        $reward = $DB->get_record('local_benefitsystem_rewards', ['id' => $record->rewardid]);
-        if ($reward) {
-            $record->reward = $reward;
-            $result[] = $record;
+        $reward = $rewards[$record->rewardid] ?? null;
+        if (!$reward) {
+            continue;
         }
+        $record->reward = $reward;
+        $result[] = $record;
     }
-    
+
     return $result;
 }
 
@@ -663,38 +701,57 @@ function local_benefitsystem_get_user_exchange_history($userid) {
  */
 function local_benefitsystem_get_all_exchanges() {
     global $DB;
-    
-    // Get all completed exchanges.
-    $exchanges = $DB->get_records('local_benefitsystem_exchanges', 
-        ['status' => 'completed'], 
+
+    $exchanges = $DB->get_records('local_benefitsystem_exchanges',
+        ['status' => 'completed'],
         'timecreated DESC'
     );
-    
-    $result = [];
-    foreach ($exchanges as $exchange) {
-        $reward = $DB->get_record('local_benefitsystem_rewards', ['id' => $exchange->rewardid]);
-        $user = $DB->get_record('user', ['id' => $exchange->userid], 
-            'id, firstname, lastname, firstnamephonetic, lastnamephonetic, middlename, alternatename, email');
-        
-        if ($reward && $user) {
-            $exchange->reward = $reward;
-            $exchange->user = $user;
-            
-            // For code-type rewards, get the assigned code.
-            if ($reward->type === 'digital' && $reward->digitalsubtype === 'code') {
-                $code = $DB->get_record('local_benefitsystem_codes', [
-                    'exchangeid' => $exchange->id,
-                    'used' => 1
-                ]);
-                if ($code) {
-                    $exchange->code = $code->code;
-                }
-            }
-            
-            $result[] = $exchange;
+
+    if (empty($exchanges)) {
+        return [];
+    }
+
+    $rewardids = array_unique(array_map(function($e) {
+        return $e->rewardid;
+    }, $exchanges));
+    $userids = array_unique(array_map(function($e) {
+        return $e->userid;
+    }, $exchanges));
+    $rewards = $DB->get_records_list('local_benefitsystem_rewards', 'id', $rewardids);
+    $users = $DB->get_records_list('user', 'id', $userids, '',
+        'id, firstname, lastname, firstnamephonetic, lastnamephonetic, middlename, alternatename, email');
+
+    $exchangeids = array_map(function($e) {
+        return $e->id;
+    }, $exchanges);
+    $codesbyexchange = [];
+    if (!empty($exchangeids)) {
+        list($insql, $inparams) = $DB->get_in_or_equal($exchangeids, SQL_PARAMS_NAMED);
+        $inparams['used'] = 1;
+        $codes = $DB->get_records_sql(
+            "SELECT id, exchangeid, code FROM {local_benefitsystem_codes} WHERE used = :used AND exchangeid $insql",
+            $inparams
+        );
+        foreach ($codes as $c) {
+            $codesbyexchange[$c->exchangeid] = $c->code;
         }
     }
-    
+
+    $result = [];
+    foreach ($exchanges as $exchange) {
+        $reward = $rewards[$exchange->rewardid] ?? null;
+        $user = $users[$exchange->userid] ?? null;
+        if (!$reward || !$user) {
+            continue;
+        }
+        $exchange->reward = $reward;
+        $exchange->user = $user;
+        if ($reward->type === 'digital' && $reward->digitalsubtype === 'code' && isset($codesbyexchange[$exchange->id])) {
+            $exchange->code = $codesbyexchange[$exchange->id];
+        }
+        $result[] = $exchange;
+    }
+
     return $result;
 }
 
@@ -705,25 +762,38 @@ function local_benefitsystem_get_all_exchanges() {
  */
 function local_benefitsystem_get_all_exchange_history() {
     global $DB;
-    
-    $history = $DB->get_records('local_benefitsystem_exchange_history', 
-        null, 
+
+    $history = $DB->get_records('local_benefitsystem_exchange_history',
+        null,
         'timeredeemed DESC'
     );
-    
+
+    if (empty($history)) {
+        return [];
+    }
+
+    $rewardids = array_unique(array_map(function($r) {
+        return $r->rewardid;
+    }, $history));
+    $userids = array_unique(array_map(function($r) {
+        return $r->userid;
+    }, $history));
+    $rewards = $DB->get_records_list('local_benefitsystem_rewards', 'id', $rewardids);
+    $users = $DB->get_records_list('user', 'id', $userids, '',
+        'id, firstname, lastname, firstnamephonetic, lastnamephonetic, middlename, alternatename, email');
+
     $result = [];
     foreach ($history as $record) {
-        $reward = $DB->get_record('local_benefitsystem_rewards', ['id' => $record->rewardid]);
-        $user = $DB->get_record('user', ['id' => $record->userid], 
-            'id, firstname, lastname, firstnamephonetic, lastnamephonetic, middlename, alternatename, email');
-        
-        if ($reward && $user) {
-            $record->reward = $reward;
-            $record->user = $user;
-            $result[] = $record;
+        $reward = $rewards[$record->rewardid] ?? null;
+        $user = $users[$record->userid] ?? null;
+        if (!$reward || !$user) {
+            continue;
         }
+        $record->reward = $reward;
+        $record->user = $user;
+        $result[] = $record;
     }
-    
+
     return $result;
 }
 
