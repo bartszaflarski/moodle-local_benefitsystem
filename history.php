@@ -31,11 +31,7 @@ require_login();
 global $USER, $DB;
 
 $context = context_system::instance();
-
-// Check if user is site admin or has manage rewards capability.
-if (!is_siteadmin() && !has_capability('local/benefitsystem:managerewards', $context)) {
-    require_capability('local/benefitsystem:managerewards', $context);
-}
+require_capability('local/benefitsystem:managerewards', $context);
 
 $PAGE->set_context($context);
 $PAGE->set_url(new moodle_url('/local/benefitsystem/history.php'));

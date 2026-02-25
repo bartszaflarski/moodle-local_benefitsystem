@@ -30,7 +30,10 @@ require_login();
 
 global $USER, $DB;
 
-$context = context_system::instance();
+// Your rewards page shows the current user's data; use user context and require view capability.
+$context = context_user::instance($USER->id);
+require_capability('local/benefitsystem:viewrewards', context_system::instance());
+
 $PAGE->set_context($context);
 $PAGE->set_url(new moodle_url('/local/benefitsystem/your_rewards.php'));
 $PAGE->set_title(get_string('yourrewards', 'local_benefitsystem'));
