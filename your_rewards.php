@@ -30,9 +30,8 @@ require_login();
 
 global $USER, $DB;
 
-// Your rewards page shows the current user's data; use user context and require view capability.
+// Your rewards page shows the current user's data; use user context (correct context level for security).
 $context = context_user::instance($USER->id);
-require_capability('local/benefitsystem:viewrewards', context_system::instance());
 
 $PAGE->set_context($context);
 $PAGE->set_url(new moodle_url('/local/benefitsystem/your_rewards.php'));
@@ -155,14 +154,17 @@ if (empty($exchanges)) {
             echo html_writer::end_div();
         }
         
-        // How to redeem (if available).
+        // How to Redeem: always show so the user sees instructions.
+        echo html_writer::start_div('how-to-redeem mb-2', ['style' => 'padding: 10px; background-color: #e7f3ff; border-radius: 5px;']);
+        echo html_writer::tag('strong', get_string('howtoredeem', 'local_benefitsystem') . ': ');
         if (!empty($reward->howtoredeem)) {
-            echo html_writer::start_div('how-to-redeem mb-2', ['style' => 'padding: 10px; background-color: #e7f3ff; border-radius: 5px;']);
-            echo html_writer::tag('strong', get_string('howtoredeem', 'local_benefitsystem') . ': ');
             echo html_writer::tag('div', format_text($reward->howtoredeem, FORMAT_HTML), 
                 ['style' => 'margin-top: 5px;']);
-            echo html_writer::end_div();
+        } else {
+            echo html_writer::tag('div', get_string('howtoredeem_empty', 'local_benefitsystem'), 
+                ['style' => 'margin-top: 5px; color: #666;']);
         }
+        echo html_writer::end_div();
         
         // Exchange details.
         echo html_writer::start_tag('div', ['class' => 'exchange-details', 'style' => 

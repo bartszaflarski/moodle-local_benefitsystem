@@ -58,6 +58,7 @@ $string['codescsv'] = 'Upload Codes (CSV)';
 $string['codescsv_help'] = 'Upload a CSV file with codes. Each line should contain one code. This will add codes to the existing list.';
 $string['howtoredeem'] = 'How to Redeem';
 $string['howtoredeem_help'] = 'Instructions on how users can redeem this reward after exchanging points for it.';
+$string['howtoredeem_empty'] = 'No specific instructions.';
 $string['codessaved'] = 'Saved {$a} new code(s)';
 $string['yourcode'] = 'Your Code';
 $string['quantity'] = 'Quantity';

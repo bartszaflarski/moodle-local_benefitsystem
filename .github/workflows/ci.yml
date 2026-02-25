@@ -1,0 +1,45 @@
+name: Create Release
+
+on:
+  push:
+    tags: [ '*' ]
+
+jobs:
+  release:
+    # Avoid forks to perform this job.
+    if: github.repository_owner == 'moodlehq'
+    name: Create Release
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+
+      - name: Setup PHP 8.1
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: 8.1
+          ini-values: phar.readonly = false
+
+      - name: Build PHAR
+        run: |
+          make build
+          php build/moodle-plugin-ci.phar list
+
+      - name: Extract release notes from changelog
+        id: extract-release-notes
+        uses: yashanand1910/standard-release-notes@v1.5.0
+        with:
+          changelog_path: docs/CHANGELOG.md
+          version: ${{ github.ref }}
+
+      - name: Create Release
+        uses: ncipollo/release-action@v1
+        with:
+          artifacts: build/moodle-plugin-ci.phar
+          artifactContentType: application/zip
+          body: |
+            ${{ steps.extract-release-notes.outputs.release_notes }}
+            #
+            Take a look at the [CHANGELOG](https://moodlehq.github.io/moodle-plugin-ci/CHANGELOG.html) for details about other releases.
+            Please follow the [4.0 Upgrade guide](https://moodlehq.github.io/moodle-plugin-ci/UPGRADE-4.0.html) when upgrading from 3.x.

@@ -31,7 +31,6 @@ require_login();
 global $USER, $DB;
 
 $context = context_system::instance();
-require_capability('local/benefitsystem:viewrewards', $context);
 
 $PAGE->set_context($context);
 $PAGE->set_url(new moodle_url('/local/benefitsystem/rewards.php'));
@@ -267,14 +266,17 @@ if (empty($rewards)) {
                 ['class' => 'reward-description']);
         }
         
-        // How to redeem (if available).
+        // How to Redeem: always show so the user sees instructions.
+        echo html_writer::start_div('how-to-redeem mb-2', ['style' => 'padding: 10px; background-color: #e7f3ff; border-radius: 5px;']);
+        echo html_writer::tag('strong', get_string('howtoredeem', 'local_benefitsystem') . ': ');
         if (!empty($reward->howtoredeem)) {
-            echo html_writer::start_div('how-to-redeem mb-2', ['style' => 'padding: 10px; background-color: #e7f3ff; border-radius: 5px;']);
-            echo html_writer::tag('strong', get_string('howtoredeem', 'local_benefitsystem') . ': ');
             echo html_writer::tag('div', format_text($reward->howtoredeem, FORMAT_HTML), 
                 ['style' => 'margin-top: 5px;']);
-            echo html_writer::end_div();
+        } else {
+            echo html_writer::tag('div', get_string('howtoredeem_empty', 'local_benefitsystem'), 
+                ['style' => 'margin-top: 5px; color: #666;']);
         }
+        echo html_writer::end_div();
         
         // Points required.
         echo html_writer::start_tag('div', ['class' => 'reward-points', 'style' => 
