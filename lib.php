@@ -247,6 +247,170 @@ function local_benefitsystem_add_points($userid, $points, $coursemoduleid = 0) {
 }
 
 /**
+ * Process activity completion and award points (for use by adhoc task).
+ * Performs DB checks, awards points, and sends notification.
+ *
+ * @param int $userid User ID
+ * @param int $coursemoduleid Course module ID
+ * @return bool True if points were awarded, false if skipped or error
+ */
+function local_benefitsystem_award_activity_completion_points($userid, $coursemoduleid) {
+    global $DB;
+
+    $existing = $DB->get_record('local_benefitsystem_history', [
+        'userid' => $userid,
+        'coursemoduleid' => $coursemoduleid
+    ]);
+    if ($existing) {
+        return false;
+    }
+
+    $activitypoints = $DB->get_record('local_benefitsystem_activity', [
+        'coursemoduleid' => $coursemoduleid
+    ]);
+    if (!$activitypoints || $activitypoints->points <= 0) {
+        return false;
+    }
+
+    local_benefitsystem_add_points($userid, $activitypoints->points, $coursemoduleid);
+    local_benefitsystem_send_activity_points_notification($userid, $activitypoints->points, $coursemoduleid);
+    return true;
+}
+
+/**
+ * Process course completion and award points (for use by adhoc task).
+ * Performs DB checks, awards points, and sends notification.
+ *
+ * @param int $userid User ID
+ * @param int $courseid Course ID
+ * @return bool True if points were awarded, false if skipped or error
+ */
+function local_benefitsystem_award_course_completion_points($userid, $courseid) {
+    global $DB;
+
+    $existing = $DB->get_record('local_benefitsystem_history', [
+        'userid' => $userid,
+        'courseid' => $courseid,
+        'coursemoduleid' => 0
+    ]);
+    if ($existing) {
+        return false;
+    }
+
+    $coursepoints = $DB->get_record('local_benefitsystem_course', ['courseid' => $courseid]);
+    if (!$coursepoints || $coursepoints->points <= 0) {
+        return false;
+    }
+
+    $now = time();
+    $balance = $DB->get_record('local_benefitsystem_balance', ['userid' => $userid]);
+    if (!$balance) {
+        $balance = new stdClass();
+        $balance->userid = $userid;
+        $balance->points = 0;
+        $balance->timecreated = $now;
+        $balance->timemodified = $now;
+        $balance->id = $DB->insert_record('local_benefitsystem_balance', $balance);
+    }
+    $balance->points += $coursepoints->points;
+    $balance->timemodified = $now;
+    $DB->update_record('local_benefitsystem_balance', $balance);
+
+    $history = new stdClass();
+    $history->userid = $userid;
+    $history->coursemoduleid = 0;
+    $history->courseid = $courseid;
+    $history->points = $coursepoints->points;
+    $history->timecreated = $now;
+    $DB->insert_record('local_benefitsystem_history', $history);
+
+    local_benefitsystem_send_course_points_notification($userid, $coursepoints->points, $courseid);
+    return true;
+}
+
+/**
+ * Send notification to user about earning points for activity completion.
+ *
+ * @param int $userid User ID
+ * @param int $points Points awarded
+ * @param int $coursemoduleid Course module ID
+ */
+function local_benefitsystem_send_activity_points_notification($userid, $points, $coursemoduleid) {
+    global $CFG;
+
+    require_once($CFG->libdir . '/messagelib.php');
+
+    $cm = get_coursemodule_from_id('', $coursemoduleid, 0, false, IGNORE_MISSING);
+    if (!$cm) {
+        return;
+    }
+    $activityname = $cm->name ?? get_string('pluginname', 'mod_' . $cm->modname);
+    $userbalance = local_benefitsystem_get_user_balance($userid);
+    $userto = \core_user::get_user($userid, '*', MUST_EXIST);
+
+    $message = new \core\message\message();
+    $message->component = 'local_benefitsystem';
+    $message->name = 'points_earned';
+    $message->userfrom = \core_user::get_noreply_user();
+    $message->userto = $userto;
+    $message->subject = get_string('pointsaddednotificationsubject', 'local_benefitsystem');
+    $a = (object)[
+        'points' => number_format($points),
+        'activityname' => format_string($activityname),
+        'totalpoints' => number_format($userbalance)
+    ];
+    $message->fullmessage = get_string('pointsaddednotification', 'local_benefitsystem', $a);
+    $message->fullmessageformat = FORMAT_PLAIN;
+    $message->fullmessagehtml = '<p>' . get_string('pointsaddednotification', 'local_benefitsystem', $a) . '</p>';
+    $message->smallmessage = get_string('pointsaddednotification', 'local_benefitsystem', $a);
+    $message->notification = 1;
+    $message->contexturl = new \moodle_url('/mod/' . $cm->modname . '/view.php', ['id' => $coursemoduleid]);
+    $message->contexturlname = format_string($activityname);
+    message_send($message);
+}
+
+/**
+ * Send notification to user about earning points for course completion.
+ *
+ * @param int $userid User ID
+ * @param int $points Points awarded
+ * @param int $courseid Course ID
+ */
+function local_benefitsystem_send_course_points_notification($userid, $points, $courseid) {
+    global $DB, $CFG;
+
+    require_once($CFG->libdir . '/messagelib.php');
+
+    $course = $DB->get_record('course', ['id' => $courseid], '*', IGNORE_MISSING);
+    if (!$course) {
+        return;
+    }
+    $coursename = format_string($course->fullname);
+    $userbalance = local_benefitsystem_get_user_balance($userid);
+    $userto = \core_user::get_user($userid, '*', MUST_EXIST);
+
+    $message = new \core\message\message();
+    $message->component = 'local_benefitsystem';
+    $message->name = 'points_earned';
+    $message->userfrom = \core_user::get_noreply_user();
+    $message->userto = $userto;
+    $message->subject = get_string('coursepointsaddednotificationsubject', 'local_benefitsystem');
+    $a = (object)[
+        'points' => number_format($points),
+        'coursename' => $coursename,
+        'totalpoints' => number_format($userbalance)
+    ];
+    $message->fullmessage = get_string('coursepointsaddednotification', 'local_benefitsystem', $a);
+    $message->fullmessageformat = FORMAT_PLAIN;
+    $message->fullmessagehtml = '<p>' . get_string('coursepointsaddednotification', 'local_benefitsystem', $a) . '</p>';
+    $message->smallmessage = get_string('coursepointsaddednotification', 'local_benefitsystem', $a);
+    $message->notification = 1;
+    $message->contexturl = new \moodle_url('/course/view.php', ['id' => $courseid]);
+    $message->contexturlname = $coursename;
+    message_send($message);
+}
+
+/**
  * Callback to extend course completion form with points field.
  * This is called from course/completion_form.php after the form definition.
  *
