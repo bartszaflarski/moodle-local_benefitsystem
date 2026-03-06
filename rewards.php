@@ -14,7 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
-defined('MOODLE_INTERNAL') || die();
 
 /**
  * Rewards page - displays list of rewards that can be exchanged for points
@@ -27,19 +26,30 @@ defined('MOODLE_INTERNAL') || die();
 require_once(__DIR__ . '/../../config.php');
 require_once($CFG->libdir . '/adminlib.php');
 require_once(__DIR__ . '/lib.php');
+defined('MOODLE_INTERNAL') || die();
 
 require_login();
 
 global $USER, $DB;
 
 $context = context_system::instance();
-require_capability('local/benefitsystem:viewrewards', $context);
-
 $PAGE->set_context($context);
 $PAGE->set_url(new moodle_url('/local/benefitsystem/rewards.php'));
 $PAGE->set_title(get_string('rewards', 'local_benefitsystem'));
 $PAGE->set_heading(get_string('rewards', 'local_benefitsystem'));
 $PAGE->set_pagelayout('standard');
+
+if (!has_capability('local/benefitsystem:viewrewards', $context)) {
+    try {
+        echo $OUTPUT->header();
+        echo $OUTPUT->notification(get_string('nopermissions', 'error'), \core\output\notification::NOTIFY_ERROR);
+        echo $OUTPUT->footer();
+    } catch (Throwable $e) {
+        echo '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Access denied</title></head><body>';
+        echo '<p><strong>You do not have permission to view this page.</strong></p></body></html>';
+    }
+    exit;
+}
 
 // Handle exchange action.
 $exchange = optional_param('exchange', 0, PARAM_INT);

@@ -22,8 +22,6 @@
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-defined('MOODLE_INTERNAL') || die();
-
 $string['pluginname'] = 'Benefit system';
 $string['points'] = 'Points';
 $string['points_desc'] = 'Number of points to award when this activity is completed';
